@@ -15,7 +15,7 @@ import LecturePlayer from "./pages/LecturePlayer";
 
 // admin
 import Sidebar from "./pages/admin/Sidebar";
-import Dashboard from "./pages/admin/Dashboard";
+const Dashboard = React.lazy(() => import("./pages/admin/Dashboard"));
 import CourseTable from "./pages/admin/course/CourseTable";
 import AddCourse from "./pages/admin/course/AddCourse";
 import EditCourse from "./pages/admin/course/EditCourse";
@@ -93,7 +93,7 @@ const appRouter = createBrowserRouter([
           {
             element: <Sidebar />,
             children: [
-              { path: "dashboard", element: <Dashboard /> },
+              { path: "dashboard", element:(<Suspense fallback={<LoadingSpinner />}> <Dashboard /></Suspense> )},
               { path: "course", element: <CourseTable /> },
               { path: "course/create", element: <AddCourse /> },
               { path: "course/:id", element: <EditCourse /> },

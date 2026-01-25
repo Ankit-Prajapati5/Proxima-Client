@@ -7,13 +7,22 @@ import { motion, AnimatePresence } from "framer-motion";
 
 const HeroSection = () => {
   const [keyword, setKeyword] = useState("");
-  const [isIntroActive, setIsIntroActive] = useState(true);
+ const [isIntroActive, setIsIntroActive] = useState(() => {
+  return !sessionStorage.getItem("acadifySplashShown");
+});
+
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const timer = setTimeout(() => setIsIntroActive(false), 2000);
-    return () => clearTimeout(timer);
-  }, []);
+ useEffect(() => {
+  if (!isIntroActive) return;
+
+  const timer = setTimeout(() => {
+    setIsIntroActive(false);
+    sessionStorage.setItem("acadifySplashShown", "true");
+  }, 2000);
+
+  return () => clearTimeout(timer);
+}, [isIntroActive]);
 
   const handleSearch = (searchQuery) => {
     const term = searchQuery || keyword;
@@ -21,44 +30,56 @@ const HeroSection = () => {
     navigate(`/course/search?search=${encodeURIComponent(term)}`);
   };
 
+
+
   return (
     <div className="relative bg-[#f1f5f9] dark:bg-zinc-950 min-h-screen flex flex-col justify-center items-center py-16 sm:py-20 px-4 sm:px-6 overflow-hidden transition-colors duration-500 font-sans">
 
       {/* ⭐ Animated Stars Background */}
       {!isIntroActive && (
-        <div className="absolute inset-0 z-0 pointer-events-none">
-          {[...Array(25)].map((_, i) => (
-            <motion.div
-              key={i}
-              initial={{
-                opacity: 0,
-                scale: 0,
-                x: `${Math.random() * 100}%`,
-                y: `${Math.random() * 100}%`,
-              }}
-              animate={{
-                opacity: [0, 1, 0],
-                scale: [0, Math.random() * 1.2 + 0.5, 0],
-                rotate: [0, 90, 180],
-              }}
-              transition={{
-                duration: Math.random() * 4 + 3,
-                repeat: Infinity,
-                delay: Math.random() * 5,
-                ease: "easeInOut",
-              }}
-              className="absolute"
-            >
-              <div className="w-2 h-2 sm:w-3 sm:h-3 bg-yellow-400 rounded-full shadow-[0_0_15px_6px_rgba(250,204,21,0.6)]" />
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[2px] h-6 bg-yellow-200/40 blur-[1px]" />
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-[2px] bg-yellow-200/40 blur-[1px]" />
-            </motion.div>
-          ))}
+  <div className="absolute inset-0 z-10 pointer-events-none">
+    {[...Array(25)].map((_, i) => {
+      const top = Math.random() * 100;
+      const left = Math.random() * 100;
+      const duration = Math.random() * 4 + 4;
+      const delay = Math.random() * 5;
+      const scale = Math.random() * 0.8 + 0.6;
 
-          <div className="absolute top-1/3 right-1/4 w-[300px] sm:w-[500px] h-[300px] sm:h-[500px] bg-yellow-500/5 blur-[120px] rounded-full" />
-          <div className="absolute bottom-1/4 left-1/4 w-[250px] sm:w-[400px] h-[250px] sm:h-[400px] bg-blue-500/5 blur-[120px] rounded-full" />
-        </div>
-      )}
+      return (
+        <motion.div
+          key={i}
+          className="absolute"
+          style={{
+            top: `${top}%`,
+            left: `${left}%`,
+          }}
+          initial={{ opacity: 0, scale: 0 }}
+          animate={{
+            opacity: [0, 1, 0],
+            scale: [0, scale, 0],
+          }}
+          transition={{
+            duration: duration,
+            repeat: Infinity,
+            delay: delay,
+            ease: "easeInOut",
+          }}
+        >
+          {/* Main Star */}
+          <div className="w-3 h-3 bg-yellow-400 rounded-full shadow-[0_0_30px_12px_rgba(250,204,21,0.9)]" />
+
+          {/* Glow Layer */}
+          <div className="absolute inset-0 w-6 h-6 -translate-x-1/4 -translate-y-1/4 bg-yellow-400/40 blur-xl rounded-full" />
+        </motion.div>
+      );
+    })}
+
+    {/* Background Glow Circles (unchanged look) */}
+    <div className="absolute top-1/3 right-1/4 w-[300px] sm:w-[500px] h-[300px] sm:h-[500px] bg-yellow-500/5 blur-[120px] rounded-full" />
+    <div className="absolute bottom-1/4 left-1/4 w-[250px] sm:w-[400px] h-[250px] sm:h-[400px] bg-blue-500/5 blur-[120px] rounded-full" />
+  </div>
+)}
+
 
       {/* Splash Screen */}
       <AnimatePresence>

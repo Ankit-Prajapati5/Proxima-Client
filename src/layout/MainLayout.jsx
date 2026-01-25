@@ -1,17 +1,16 @@
 import Navbar from "@/components/Navbar";
-import React from "react";
 import { Outlet } from "react-router-dom";
+import ScrollToTop from "@/components/ScrollToTop";
 
 const MainLayout = () => {
   return (
-    /**
-     * ✅ h-screen: Poore layout ko window height pe lock kar diya.
-     * ✅ overflow-hidden: Bahar ka ganda scroll forcefully band.
-     */
-    <div className="h-screen flex flex-col  bg-white dark:bg-[#0A0A0A]">
+    <div className="min-h-screen flex flex-col bg-white dark:bg-[#0A0A0A]">
+      
+      <ScrollToTop />   {/* 🔥 scroll fix */}
+
       <Navbar />
       
-      <main flex-1>
+      <main className="flex-1">
         <Outlet />
       </main>
     </div>
