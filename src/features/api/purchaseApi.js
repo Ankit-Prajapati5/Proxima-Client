@@ -4,9 +4,10 @@ import { baseApi } from "./baseApi";
 export const purchaseApi = createApi({
   reducerPath: "purchaseApi",
   baseQuery: baseApi,
-  tagTypes: ["Purchase"],
+  tagTypes: ["Purchase", "Course"], // 🔥 Course tag bhi add kiya
 
   endpoints: (builder) => ({
+
     /* ==============================
        CREATE ORDER
     ============================== */
@@ -16,6 +17,8 @@ export const purchaseApi = createApi({
         method: "POST",
         body: { courseId },
       }),
+      // 🔥 Purchase ke baad cache refresh hoga
+      invalidatesTags: ["Purchase", "Course"],
     }),
 
     /* ==============================
@@ -26,9 +29,14 @@ export const purchaseApi = createApi({
         `/course-purchase/check/${courseId}`,
       providesTags: ["Purchase"],
     }),
+
+    /* ==============================
+       MY LEARNING COURSES
+    ============================== */
     getMyLearning: builder.query({
-  query: () => "/course-purchase/my-learning",
-}),
+      query: () => "/course-purchase/my-learning",
+      providesTags: ["Purchase"],
+    }),
 
   }),
 });

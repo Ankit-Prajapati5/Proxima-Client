@@ -4,14 +4,16 @@ import { baseApi } from "./baseApi";
 export const progressApi = createApi({
   reducerPath: "progressApi",
   baseQuery: baseApi,
-  tagTypes: ["Progress"],
+  tagTypes: ["Progress", "Course"], // 🔥 Course add kiya (safe sync)
 
   endpoints: (builder) => ({
+
     /* ================= GET PROGRESS ================= */
     getCourseProgress: builder.query({
       query: (courseId) => `/progress/${courseId}`,
-      // 🎯 Specific ID based tagging taaki ek course ka update dusre ko distrub na kare
-      providesTags: (result, error, courseId) => [{ type: "Progress", id: courseId }],
+      providesTags: (result, error, courseId) => [
+        { type: "Progress", id: courseId },
+      ],
     }),
 
     /* ================= MARK COMPLETED ================= */
@@ -20,7 +22,6 @@ export const progressApi = createApi({
         url: `/progress/${courseId}/lecture/${lectureId}`,
         method: "POST",
       }),
-      // 🔥 Invalidate only the specific course progress
       invalidatesTags: (result, error, { courseId }) => [
         { type: "Progress", id: courseId },
       ],
@@ -36,11 +37,12 @@ export const progressApi = createApi({
         { type: "Progress", id: courseId },
       ],
     }),
+
   }),
 });
 
 export const {
   useGetCourseProgressQuery,
   useMarkLectureCompletedMutation,
-  useResetCourseProgressMutation
+  useResetCourseProgressMutation,
 } = progressApi;

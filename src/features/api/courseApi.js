@@ -90,16 +90,17 @@ export const courseApi = createApi({
 
     /* ================= 📖 LECTURE ENDPOINTS ================= */
     
-    createLecture: builder.mutation({
-      query: ({ courseId, lectureTitle }) => ({
-        url: `/course/${courseId}/lecture`,
-        method: "POST",
-        body: { lectureTitle },
-      }),
-      invalidatesTags: (result, error, { courseId }) => [
-        { type: "Course", id: courseId },
-      ],
-    }),
+   createLecture: builder.mutation({
+  query: ({ courseId, lectureTitle, videoId, isPreviewFree }) => ({
+    url: `/course/${courseId}/lecture`,
+    method: "POST",
+    body: { lectureTitle, videoId, isPreviewFree },
+  }),
+  invalidatesTags: (result, error, { courseId }) => [
+    { type: "Course", id: courseId },
+  ],
+}),
+
 
     getCourseLecture: builder.query({
       query: (courseId) => `/course/${courseId}/lecture`,
@@ -113,17 +114,18 @@ export const courseApi = createApi({
       ],
     }),
 
-    editLecture: builder.mutation({
-      query: ({ courseId, lectureId, formData }) => ({
-        url: `/course/${courseId}/lecture/${lectureId}`,
-        method: "PUT",
-        body: formData,
-      }),
-      invalidatesTags: (result, error, { courseId, lectureId }) => [
-        { type: "Lecture", id: lectureId },
-        { type: "Course", id: courseId },
-      ],
-    }),
+  editLecture: builder.mutation({
+  query: ({ courseId, lectureId, data }) => ({
+    url: `/course/${courseId}/lecture/${lectureId}`,
+    method: "PUT",
+    body: data,
+  }),
+  invalidatesTags: (result, error, { courseId, lectureId }) => [
+    { type: "Lecture", id: lectureId },
+    { type: "Course", id: courseId },
+  ],
+}),
+
 
     removeLecture: builder.mutation({
       query: ({ courseId, lectureId }) => ({
@@ -135,13 +137,13 @@ export const courseApi = createApi({
       ],
     }),
     /* ================= 📺 STREAM & PLAYER ================= */
-   streamLecture: builder.query({
-  query: ({ courseId, lectureId }) => ({
-    // Yahan URL check karein, kya ye backend ke route se match kar raha hai?
-    url: `/course/${courseId}/lecture/${lectureId}/stream`, 
-    method: "GET",
-  }),
-}),
+//    streamLecture: builder.query({
+//   query: ({ courseId, lectureId }) => ({
+//     // Yahan URL check karein, kya ye backend ke route se match kar raha hai?
+//     url: `/course/${courseId}/lecture/${lectureId}/stream`, 
+//     method: "GET",
+//   }),
+// }),
     /* ================= 📺 SPECIAL QUERIES ================= */
 
     getCourseDetailWithLessons: builder.query({
@@ -176,6 +178,6 @@ export const {
   useRemoveLectureMutation,
   useGetCreatorCourseByIdQuery,
   useGetCourseDetailWithLessonsQuery,
-  useLazyStreamLectureQuery,
+  // useLazyStreamLectureQuery,
   useGetDashboardStatsQuery,
 } = courseApi;
