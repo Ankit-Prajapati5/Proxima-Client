@@ -3,6 +3,7 @@ import { Button } from "./ui/button";
 import { ArrowRight, Loader2, Zap } from "lucide-react";
 import { useCreateCourseOrderMutation } from "@/features/api/purchaseApi";
 import { toast } from "sonner";
+import { RAZORPAY_KEY_ID } from "@/config";
 
 const BuyCourseButton = ({ courseId, onPaymentSuccess }) => {
   const [createCourseOrder, { isLoading }] =
@@ -12,7 +13,7 @@ const BuyCourseButton = ({ courseId, onPaymentSuccess }) => {
 
   const openRazorpay = (order) => {
     const options = {
-      key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+      key: RAZORPAY_KEY_ID,
       amount: order.amount,
       currency: order.currency,
       name: "Acadify",

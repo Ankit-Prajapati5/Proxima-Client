@@ -1,6 +1,7 @@
 import { fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+import { BASE_URL } from "./config";
 
 export const baseApi = fetchBaseQuery({
-  baseUrl: "http://localhost:5000/api/v1" || import.meta.env.VITE_API_BASE_URL,
-  credentials: "include", // 🔥 VERY IMPORTANT (cookie auth)
+  baseUrl: BASE_URL,
+  credentials: "include", // 🔥 cookie auth ke liye zaroori
 });
