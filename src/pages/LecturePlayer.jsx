@@ -1,12 +1,10 @@
 import { useParams, useNavigate } from "react-router-dom";
-import {
-  useGetCourseDetailWithLessonsQuery
-} from "@/features/api/courseApi";
+import { useGetCourseDetailWithLessonsQuery } from "@/features/api/courseApi";
 import {
   useMarkLectureCompletedMutation,
-  useGetCourseProgressQuery
+  useGetCourseProgressQuery,
 } from "@/features/api/progressApi";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { toast } from "sonner";
 import Loader from "@/components/Loader";
@@ -15,12 +13,17 @@ import {
   ChevronLeft,
   Lock,
   ArrowLeft,
-  Play
+  Play,
+  Pause,
+  Maximize,
+  CheckCircle,
+  Settings2,
+  BrainCircuit,
+  RotateCw
 } from "lucide-react";
 import confetti from "canvas-confetti";
 import BuyCourseButton from "@/components/BuyCourseButton";
 import { userLoggedOut } from "@/features/authSlice";
-
 
 const LecturePlayer = () => {
   const { courseId, lectureId } = useParams();
@@ -28,268 +31,327 @@ const LecturePlayer = () => {
   const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
 
-  const [iframeSrc, setIframeSrc] = useState("");
+  const playerRef = useRef(null);
+  const containerRef = useRef(null);
+  const progressInterval = useRef(null);
+  const controlsTimeout = useRef(null);
+
   const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const [showSettings, setShowSettings] = useState(false);
+  const [isEligibleForComplete, setIsEligibleForComplete] = useState(false);
   const [devToolsOpen, setDevToolsOpen] = useState(false);
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const [watermarkPos, setWatermarkPos] = useState({ top: "20%", left: "20%" });
 
-  const { data: courseData, isLoading } =
-    useGetCourseDetailWithLessonsQuery(courseId);
+  const { data: courseData, isLoading } = useGetCourseDetailWithLessonsQuery(courseId);
+  const { refetch: refetchProgress } = useGetCourseProgressQuery(courseId);
+  const [markCompleted, { isLoading: isMarking }] = useMarkLectureCompletedMutation();
 
-  const { refetch: refetchProgress } =
-    useGetCourseProgressQuery(courseId);
-
-  const [markCompleted] = useMarkLectureCompletedMutation();
-
-  const lectures = useMemo(
-    () => courseData?.course?.lectures || [],
-    [courseData]
-  );
-
-  const currentLecture = useMemo(
-    () => lectures.find((l) => l._id === lectureId),
-    [lectures, lectureId]
-  );
-
-  const currentIndex = useMemo(
-    () => lectures.findIndex((l) => l._id === lectureId),
-    [lectures, lectureId]
-  );
+  const lectures = useMemo(() => courseData?.course?.lectures || [], [courseData]);
+  const currentLecture = useMemo(() => lectures.find((l) => l._id === lectureId), [lectures, lectureId]);
+  const currentIndex = useMemo(() => lectures.findIndex((l) => l._id === lectureId), [lectures, lectureId]);
 
   const nextLecture = lectures[currentIndex + 1];
-  const prevLecture =
-    currentIndex > 0 ? lectures[currentIndex - 1] : null;
-
-  const isLocked =
-    !currentLecture?.isPreviewFree &&
-    !courseData?.course?.isPurchased;
+  const prevLecture = currentIndex > 0 ? lectures[currentIndex - 1] : null;
+  const isLocked = !currentLecture?.isPreviewFree && !courseData?.course?.isPurchased;
 
   // ==============================
-  // 🔥 ADVANCED DEVTOOLS SECURITY
+  // 🔥 ADVANCED STEAL SECURITY (3S DELAY ADDED)
   // ==============================
   useEffect(() => {
-    let devtoolsDetected = false;
+    let securityTimers = [];
+    let isSecurityActive = false;
 
-    const detectDevTools = () => {
-      const widthDiff = window.outerWidth - window.innerWidth;
-      const heightDiff = window.outerHeight - window.innerHeight;
-
-      if (widthDiff > 160 || heightDiff > 160) {
-        triggerSecurity();
-      }
+    const triggerSecurityLogout = () => {
+      if (devToolsOpen || !isSecurityActive) return;
+      setDevToolsOpen(true);
+      if (playerRef.current) playerRef.current.destroy();
+      localStorage.clear();
+      dispatch(userLoggedOut());
+      toast.error("SECURITY ALERT: System Compromised.");
+      setTimeout(() => { window.location.href = "/login"; }, 500);
     };
 
-    const debuggerTrap = () => {
-      const start = new Date();
-      debugger;
-      const end = new Date();
-      if (end - start > 100) {
-        triggerSecurity();
-      }
-    };
+    // Delaying security by 3 seconds to handle mounting lag/back navigation
+    const initTimeout = setTimeout(() => {
+      isSecurityActive = true;
+      const element = new Image();
+      Object.defineProperty(element, 'id', { get: triggerSecurityLogout });
+      securityTimers.push(setInterval(() => { console.log(element); console.clear(); }, 2000));
+      securityTimers.push(setInterval(() => {
+        const startTime = performance.now();
+        debugger;
+        if (performance.now() - startTime > 150) triggerSecurityLogout();
+      }, 800));
+    }, 3000);
 
-    const visibilityCheck = () => {
-      if (document.visibilityState === "hidden") {
-        console.clear();
-      }
-    };
+    const observer = new MutationObserver(() => isSecurityActive && triggerSecurityLogout());
+    if (containerRef.current) observer.observe(containerRef.current, { attributes: true, childList: true, subtree: true });
 
     const keyBlock = (e) => {
-      if (
-        e.key === "F12" ||
-        (e.ctrlKey && e.shiftKey && e.key === "I") ||
-        (e.ctrlKey && e.shiftKey && e.key === "J") ||
-        (e.ctrlKey && e.key === "U")
-      ) {
-        e.preventDefault();
-        triggerSecurity();
+      if (e.key === "F12" || (e.ctrlKey && e.shiftKey && (e.key === "I" || e.key === "J" || e.key === "C")) || (e.ctrlKey && e.key === "u")) {
+        e.preventDefault(); triggerSecurityLogout();
       }
     };
-
-    const triggerSecurity = () => {
-      if (devtoolsDetected) return;
-      devtoolsDetected = true;
-
-      setDevToolsOpen(true);
-      setIframeSrc("");
-      setIsPlaying(false);
-
-      localStorage.clear();
-      sessionStorage.clear();
-
-      dispatch(userLoggedOut());
-
-      toast.error("Security violation detected");
-
-      setTimeout(() => {
-        navigate("/login", { replace: true });
-      }, 800);
-    };
-
-    const interval1 = setInterval(detectDevTools, 1000);
-    const interval2 = setInterval(debuggerTrap, 3000);
-
-    window.addEventListener("resize", detectDevTools);
-    document.addEventListener("keydown", keyBlock);
-    document.addEventListener("visibilitychange", visibilityCheck);
-    document.addEventListener("contextmenu", (e) => e.preventDefault());
+    window.addEventListener("keydown", keyBlock);
+    window.addEventListener("resize", () => {
+        if (window.outerWidth - window.innerWidth > 160 || window.outerHeight - window.innerHeight > 160) triggerSecurityLogout();
+    });
 
     return () => {
-      clearInterval(interval1);
-      clearInterval(interval2);
-      window.removeEventListener("resize", detectDevTools);
-      document.removeEventListener("keydown", keyBlock);
-      document.removeEventListener("visibilitychange", visibilityCheck);
+      clearTimeout(initTimeout);
+      securityTimers.forEach(clearInterval);
+      observer.disconnect();
+      window.removeEventListener("keydown", keyBlock);
     };
-  }, [dispatch, navigate]);
+  }, [dispatch, navigate, devToolsOpen]);
 
   // ==============================
-  // 🔥 RELOAD GUARD
+  // 🔥 INTERACTION LOGIC
   // ==============================
   useEffect(() => {
-    const reloadKey = `lecture_reload_${courseId}_${lectureId}`;
-    const reloadCount = sessionStorage.getItem(reloadKey);
+    const interval = setInterval(() => {
+      setWatermarkPos({ top: Math.floor(Math.random() * 70 + 10) + "%", left: Math.floor(Math.random() * 70 + 10) + "%" });
+    }, 8000);
+    return () => clearInterval(interval);
+  }, []);
 
-    if (reloadCount === "1") {
-      sessionStorage.removeItem(reloadKey);
-      navigate(`/course/${courseId}/progress`, { replace: true });
-    } else {
-      sessionStorage.setItem(reloadKey, "1");
+  const handleInteraction = () => {
+    setControlsVisible(true);
+    if (controlsTimeout.current) clearTimeout(controlsTimeout.current);
+    controlsTimeout.current = setTimeout(() => { if (isPlaying) setControlsVisible(false); }, 3000);
+  };
+
+  // ==============================
+  // 🔥 YOUTUBE API SETUP
+  // ==============================
+  useEffect(() => {
+    if (!currentLecture?.videoId || isLocked || devToolsOpen) return;
+    const initPlayer = () => {
+      playerRef.current = new window.YT.Player("custom-player", {
+        videoId: currentLecture.videoId,
+        playerVars: { autoplay: 0, controls: 0, disablekb: 1, rel: 0, modestbranding: 1, iv_load_policy: 3 },
+        events: {
+          onReady: (event) => setDuration(event.target.getDuration()),
+          onStateChange: (event) => {
+            if (event.data === window.YT.PlayerState.PLAYING) {
+              setIsPlaying(true); handleInteraction(); startTracking();
+            } else {
+              setIsPlaying(false); setControlsVisible(true); stopTracking();
+            }
+          },
+        },
+      });
+    };
+    if (window.YT && window.YT.Player) initPlayer();
+    else {
+      const tag = document.createElement("script");
+      tag.src = "https://www.youtube.com/iframe_api";
+      window.onYouTubeIframeAPIReady = initPlayer;
+      document.body.appendChild(tag);
     }
+    return () => { stopTracking(); if (playerRef.current) playerRef.current.destroy(); };
+  }, [currentLecture?.videoId, isLocked, devToolsOpen]);
 
-    return () => {
-      sessionStorage.removeItem(reloadKey);
-    };
-  }, [courseId, lectureId, navigate]);
+  const startTracking = () => {
+    progressInterval.current = setInterval(() => {
+      if (playerRef.current?.getCurrentTime) {
+        const current = playerRef.current.getCurrentTime();
+        const total = playerRef.current.getDuration();
+        setCurrentTime(current);
+        if (current >= total - 1.5) playerRef.current.pauseVideo();
+        if (current > total * 0.90) setIsEligibleForComplete(true);
+      }
+    }, 500);
+  };
 
-  // Initial embed
-  useEffect(() => {
-    if (!currentLecture?.videoId) return;
+  const stopTracking = () => clearInterval(progressInterval.current);
 
-    setIsPlaying(false);
+  const togglePlay = () => {
+    if (!playerRef.current || devToolsOpen) return;
+    const state = playerRef.current.getPlayerState();
+    state === 1 ? playerRef.current.pauseVideo() : playerRef.current.playVideo();
+    handleInteraction();
+  };
+  
+  const handleSeek = (e) => {
+    const time = parseFloat(e.target.value);
+    setCurrentTime(time);
+    playerRef.current.seekTo(time, true);
+    handleInteraction();
+  };
 
-    setIframeSrc(
-      `https://www.youtube.com/embed/${currentLecture.videoId}?controls=0&rel=0&modestbranding=1&disablekb=1&playsinline=1`
-    );
-  }, [currentLecture?.videoId]);
+  const changeSpeed = (speed) => {
+    playerRef.current.setPlaybackRate(speed);
+    setPlaybackRate(speed);
+    setShowSettings(false);
+  };
 
-  const handlePlay = () => {
-    setIframeSrc(
-      `https://www.youtube.com/embed/${currentLecture.videoId}?autoplay=1&controls=0&rel=0&modestbranding=1&disablekb=1&playsinline=1`
-    );
-    setIsPlaying(true);
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+        containerRef.current.requestFullscreen();
+        if (screen.orientation && screen.orientation.lock) {
+            screen.orientation.lock("landscape").catch(() => {});
+        }
+    } else {
+        document.exitFullscreen();
+    }
+  };
+
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
   };
 
   const handleManualComplete = async () => {
+    if (!isEligibleForComplete) return toast.error("90% video dekhein!");
     try {
       await markCompleted({ courseId, lectureId }).unwrap();
-      toast.success("Lecture Completed");
+      toast.success("Completed!");
       refetchProgress();
-
-      if (!nextLecture) {
-        confetti({
-          particleCount: 200,
-          spread: 80,
-          origin: { y: 0.6 },
-        });
-      } else {
-        navigate(`/course/${courseId}/lecture/${nextLecture._id}`);
-      }
-    } catch (err) {
-      console.error(err);
-    }
+      if (!nextLecture) confetti({ particleCount: 150 });
+      else navigate(`/course/${courseId}/lecture/${nextLecture._id}`);
+    } catch (err) { toast.error("Error"); }
   };
 
   if (isLoading || !currentLecture) return <Loader />;
 
   return (
-    <div className="h-[100vh] w-full flex flex-col bg-black text-white overflow-hidden">
-
+    <div className="flex flex-col bg-black text-white w-full h-[100dvh] pt-16 overflow-hidden select-none">
+      
       {devToolsOpen && (
-        <div className="absolute inset-0 bg-black z-50 flex items-center justify-center text-red-500 text-xl font-bold">
-          Session Terminated
+        <div className="fixed inset-0 bg-black z-[9999] flex flex-col items-center justify-center text-red-600 font-black text-3xl animate-pulse">
+           SECURITY BREACH DETECTED
         </div>
       )}
 
-      <div className="px-4 pt-4 shrink-0">
-        <button
-          onClick={() => navigate(`/course-detail/${courseId}`)}
-          className="flex items-center gap-2 text-zinc-400 hover:text-white bg-zinc-900/50 px-3 py-1.5 rounded-full border border-zinc-800 text-sm"
-        >
-          <ArrowLeft size={16} />
-          Back
+      {/* HEADER */}
+      <div className="px-6 py-3 flex items-center justify-between border-b border-zinc-800 bg-zinc-900/90 z-50 shrink-0">
+        <button onClick={() => navigate(`/course-detail/${courseId}`)} className="flex items-center gap-2 text-zinc-400 hover:text-white">
+          <ArrowLeft size={18} /> <span className="text-sm font-medium">Back</span>
         </button>
+        <div className="text-center hidden md:block">
+          <h2 className="text-sm font-semibold truncate max-w-md">{currentLecture.lectureTitle}</h2>
+          <p className="text-[10px] text-zinc-500 uppercase tracking-widest">Lecture {currentIndex + 1} of {lectures.length}</p>
+        </div>
+        <div className="px-3 py-1 bg-zinc-800 rounded-full border border-zinc-700 text-[10px] font-bold text-red-500">
+           AES-256 SECURE
+        </div>
       </div>
 
-      <div className="relative flex-1 mx-4 my-3 bg-black rounded-xl overflow-hidden border border-zinc-800">
-        {!isLocked && user && (
-          <div className="absolute top-4 left-4 z-40 pointer-events-none opacity-20">
-            <p className="text-xs font-mono">
-              {user.email} • PROTECTED
-            </p>
-          </div>
-        )}
-
+      {/* PLAYER AREA */}
+      <div 
+        ref={containerRef} 
+        onMouseMove={handleInteraction}
+        onTouchStart={handleInteraction}
+        className="relative flex-1 bg-black group flex items-center justify-center overflow-hidden"
+        style={{ cursor: controlsVisible ? 'default' : 'none' }}
+      >
         {isLocked ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 text-center p-6">
-            <Lock size={40} className="text-orange-500 mb-4" />
-            <h2 className="text-xl font-bold mb-4">
-              Premium Content
-            </h2>
-            <BuyCourseButton courseId={courseId} />
-          </div>
+          <div className="flex flex-col items-center p-6"><Lock size={40} className="text-orange-500 mb-4" /><BuyCourseButton courseId={courseId} /></div>
         ) : (
-          <>
-            <iframe
-              className="w-full h-full"
-              src={iframeSrc}
-              title="Lecture Player"
-              allow="autoplay; encrypted-media; fullscreen"
-              allowFullScreen
-            />
-            <div className="absolute inset-0 bg-transparent z-20" />
-          </>
+          <div className="w-full h-full relative flex items-center justify-center overflow-hidden">
+            
+            {/* ULTRA CROP */}
+            <div className={`absolute w-[114%] h-[124%] transition-all duration-1000 ${isPlaying ? 'opacity-100 scale-100' : 'opacity-10 blur-xl scale-110'}`}>
+               {!devToolsOpen && <div id="custom-player" className="w-full h-full pointer-events-none"></div>}
+            </div>
+
+            {/* WATERMARK */}
+            <div className="absolute pointer-events-none z-40 transition-all duration-[8000ms] ease-in-out select-none opacity-20" style={{ top: watermarkPos.top, left: watermarkPos.left }}>
+                <p className="text-[10px] md:text-xs font-mono text-white bg-black/40 px-3 py-1 rounded-full border border-white/10 uppercase tracking-widest">{user?.email}</p>
+            </div>
+
+            {/* PRE-PLAY OVERLAY */}
+            {!isPlaying && !devToolsOpen && (
+                <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/60 backdrop-blur-[2px]">
+                   <button onClick={togglePlay} className="bg-orange-600 hover:bg-orange-500 p-8 rounded-full shadow-[0_0_50px_rgba(234,88,12,0.4)] transform hover:scale-110 active:scale-95 transition-all">
+                      <Play size={44} fill="white" />
+                   </button>
+                </div>
+            )}
+            
+            {/* INVISIBLE SHIELD */}
+            <div className="absolute inset-0 z-10" onClick={togglePlay} onDoubleClick={toggleFullscreen} />
+
+            {/* CONTROLS OVERLAY */}
+            <div className={`absolute inset-0 z-30 flex flex-col justify-end bg-gradient-to-t from-black via-transparent transition-opacity duration-700 p-6 ${controlsVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+               <div className="max-w-6xl mx-auto w-full space-y-4">
+                  <div className="flex items-center gap-3">
+                    <span className="text-[10px] font-mono text-zinc-400">{formatTime(currentTime)}</span>
+                    <input type="range" min="0" max={duration} value={currentTime} onChange={handleSeek} className="flex-1 h-1 bg-zinc-700/50 rounded-lg appearance-none cursor-pointer accent-orange-600" />
+                    <span className="text-[10px] font-mono text-zinc-400">{formatTime(duration)}</span>
+                  </div>
+
+                  <div className="flex items-center justify-between px-2">
+                    <div className="flex items-center gap-6 md:gap-10">
+                        
+                        {/* 🔥 BADGE AREA - EXACTLY WHERE YOU HIGHLIGHTED */}
+                        <div className="relative flex items-center">
+                            <div className={`absolute right-[120%] transition-all duration-500 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border backdrop-blur-md shadow-lg ${isPlaying ? 'bg-red-500/10 border-red-500/30 text-red-500' : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500 animate-bounce'}`}>
+                                <span className="text-[9px] font-black uppercase tracking-widest whitespace-nowrap">
+                                    {isPlaying ? "Click to Pause 👉" : "Click to Play 👉"}
+                                </span>
+                            </div>
+
+                            <button onClick={togglePlay} className="hover:text-orange-500 transition-colors">
+                               {isPlaying ? <Pause size={28} /> : <Play size={28} fill="currentColor" />}
+                            </button>
+                        </div>
+
+                        <div className="relative">
+                           <button onClick={(e) => { e.stopPropagation(); setShowSettings(!showSettings); }} className="text-[11px] font-bold bg-zinc-800/80 px-4 py-2 rounded-lg border border-zinc-700 hover:border-orange-500">
+                              <Settings2 size={16} className="inline mr-1" /> {playbackRate}x
+                           </button>
+                           {showSettings && (
+                              <div className="absolute bottom-12 left-0 bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden w-36 shadow-2xl z-50">
+                                 {[1, 1.25, 1.5, 2].map(speed => (
+                                    <button key={speed} onClick={() => changeSpeed(speed)} className={`w-full text-left px-5 py-3 text-[11px] hover:bg-zinc-800 ${playbackRate === speed ? 'text-orange-500 bg-orange-500/5 font-bold' : ''}`}>
+                                       {speed}x
+                                    </button>
+                                 ))}
+                              </div>
+                           )}
+                        </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3">
+                        {/* 🔥 MOBILE LANDSCAPE BUTTON */}
+                        <button onClick={toggleFullscreen} className="md:hidden flex items-center gap-2 bg-zinc-800 px-3 py-1.5 rounded-lg border border-zinc-700 text-[10px] font-bold active:scale-95">
+                           <RotateCw size={14} className="text-orange-500" /> Landscape
+                        </button>
+                        <button onClick={toggleFullscreen} className="hover:text-orange-500 transition-all"><Maximize size={24} /></button>
+                    </div>
+                  </div>
+               </div>
+            </div>
+          </div>
         )}
       </div>
 
-      <div className="shrink-0 mx-4 mb-4 flex justify-between items-center">
-        <button
-          disabled={!prevLecture}
-          onClick={() =>
-            navigate(`/course/${courseId}/lecture/${prevLecture?._id}`)
-          }
-          className="p-3 bg-zinc-800 rounded-full disabled:opacity-40"
-        >
-          <ChevronLeft size={20} />
-        </button>
-
-        {!isPlaying && (
-          <button
-            onClick={handlePlay}
-            className="bg-orange-600 hover:bg-orange-500 px-6 py-2 rounded-full flex items-center gap-2 font-semibold"
-          >
-            <Play size={18} />
-            Play
-          </button>
-        )}
-
-        {isPlaying && (
-          <button
-            onClick={handleManualComplete}
-            className="bg-green-600 hover:bg-green-500 px-6 py-2 rounded-full font-semibold"
-          >
-            Mark Complete
-          </button>
-        )}
-
-        <button
-          disabled={!nextLecture}
-          onClick={() =>
-            navigate(`/course/${courseId}/lecture/${nextLecture?._id}`)
-          }
-          className="p-3 bg-white text-black rounded-full disabled:opacity-40"
-        >
-          <ChevronRight size={20} />
-        </button>
+      {/* FOOTER */}
+      <div className="p-4 bg-zinc-900 border-t border-zinc-800 flex flex-col md:flex-row items-center justify-between gap-4 px-10 shrink-0">
+        <div className="flex items-center gap-4">
+            <button disabled={!prevLecture} onClick={() => navigate(`/course/${courseId}/lecture/${prevLecture?._id}`)} className="p-3 bg-zinc-800 rounded-xl disabled:opacity-20 hover:bg-zinc-700 border border-zinc-700"><ChevronLeft size={22}/></button>
+            <button disabled={!nextLecture} onClick={() => navigate(`/course/${courseId}/lecture/${nextLecture?._id}`)} className="p-3 bg-zinc-800 rounded-xl disabled:opacity-20 hover:bg-zinc-700 border border-zinc-700"><ChevronRight size={22}/></button>
+        </div>
+        <div className="flex items-center gap-4 w-full md:w-auto">
+            <button onClick={() => toast.info("Quiz Engine launching soon!")} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-purple-400 px-8 py-3 rounded-2xl font-bold border border-purple-500/20 active:scale-95 transition-all">
+              <BrainCircuit size={20} /> Quiz
+            </button>
+            <button
+              onClick={handleManualComplete}
+              disabled={isMarking || !isEligibleForComplete}
+              className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-10 py-3 rounded-2xl font-bold active:scale-95 transition-all shadow-xl ${isEligibleForComplete ? "bg-emerald-600 hover:bg-emerald-500 text-white" : "bg-zinc-800 text-zinc-500 border border-zinc-700 cursor-not-allowed"}`}
+            >
+              {isMarking ? <Loader size={20} /> : <CheckCircle size={20} />}
+              {isEligibleForComplete ? "Mark Complete" : "90% Min"}
+            </button>
+        </div>
       </div>
     </div>
   );
