@@ -73,17 +73,19 @@ const MobileNavbar = ({ user, logoutHandler, goToAuth, isLoggingOut, pathname })
               <Separator className="my-2 dark:bg-zinc-800" />
               
               <Button 
-                variant="destructive" 
-                disabled={isLoggingOut}
-                onClick={async () => {
-                  setOpen(false);
-                  await logoutHandler();
-                }} 
-                className="w-full rounded-xl font-bold uppercase text-xs h-12"
-              >
-                {isLoggingOut ? <Loader2 className="animate-spin mr-2" size={16} /> : <LogOut size={16} className="mr-2" />}
-                Logout
-              </Button>
+  variant="destructive" 
+  disabled={isLoggingOut}
+  // onClick की जगह onPointerDown ज्यादा रिलायबल है मोबाइल के लिए
+  onPointerDown={(e) => {
+    e.preventDefault(); // Default behavior रोकें
+    setOpen(false);     // पहले शीट बंद करें
+    logoutHandler();    // फिर लॉगआउट चलाएँ
+  }} 
+  className="w-full rounded-xl font-bold uppercase text-xs h-12"
+>
+  {isLoggingOut ? <Loader2 className="animate-spin mr-2" size={16} /> : <LogOut size={16} className="mr-2" />}
+  Logout
+</Button>
             </>
           ) : (
             <div className="flex flex-col gap-3">
@@ -106,13 +108,20 @@ const Navbar = () => {
   const [logoutUser, { isLoading, isSuccess }] = useLogoutMutation();
 
   const logoutHandler = async () => {
+    // 1. तुरंत Redux स्टेट साफ करें (Force Logout)
+    dispatch(userLoggedOut()); 
+    
+    // 2. तुरंत नेविगेट करें
+    navigate("/login");
+
+    // 3. टोस्ट दिखाएँ
+    toast.success("Logged out successfully");
+
+    // 4. अब बैकग्राउंड में शांति से API कॉल करें
     try {
-      const res = await logoutUser().unwrap();
-      dispatch(userLoggedOut()); 
-      toast.success(res?.message || "Logged out successfully");
-      navigate("/login");
+      await logoutUser().unwrap();
     } catch (err) {
-      toast.error("Logout failed.");
+      console.error("Backend logout failed, but local session cleared.");
     }
   };
 
