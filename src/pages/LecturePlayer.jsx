@@ -20,7 +20,8 @@ import {
   Settings2,
   BrainCircuit,
   RotateCw,
-  Loader2
+  Loader2,
+  ScreenShare // Landscape ke liye icon
 } from "lucide-react";
 import confetti from "canvas-confetti";
 import BuyCourseButton from "@/components/BuyCourseButton";
@@ -50,10 +51,7 @@ const LecturePlayer = () => {
   const [controlsVisible, setControlsVisible] = useState(true);
   const [watermarkPos, setWatermarkPos] = useState({ top: "20%", left: "20%" });
   
-  // 🔥 EXTRA STATE FOR BOTTOM SHIELD
   const [showBottomShield, setShowBottomShield] = useState(false);
-
-  // 🔥 STATES
   const [isNavigating, setIsNavigating] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -69,7 +67,6 @@ const LecturePlayer = () => {
   const prevLecture = currentIndex > 0 ? lectures[currentIndex - 1] : null;
   const isLocked = !currentLecture?.isPreviewFree && !courseData?.course?.isPurchased;
 
-  // 🔥 BOTTOM SHIELD LOGIC (3 SECONDS ON PLAY)
   useEffect(() => {
     if (isPlaying) {
       setShowBottomShield(true);
@@ -80,14 +77,12 @@ const LecturePlayer = () => {
     }
   }, [isPlaying]);
 
-  // Track Fullscreen changes
   useEffect(() => {
     const handleFsChange = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener("fullscreenchange", handleFsChange);
     return () => document.removeEventListener("fullscreenchange", handleFsChange);
   }, []);
 
-  // Persistence Logic: Eligibility stays true once reached
   useEffect(() => {
     setIsNavigating(false);
     setIsPlaying(false);
@@ -105,9 +100,7 @@ const LecturePlayer = () => {
     }, 50);
   };
 
-  // ==============================
-  // 🔥 SECURITY LOGIC (UNTOUCHED)
-  // ==============================
+  // SECURITY LOGIC
   useEffect(() => {
     let securityTimers = [];
     let isSecurityActive = false;
@@ -160,9 +153,7 @@ const LecturePlayer = () => {
     controlsTimeout.current = setTimeout(() => { if (isPlaying) setControlsVisible(false); }, 3000);
   };
 
-  // ==============================
-  // 🔥 YOUTUBE API SETUP
-  // ==============================
+  // YOUTUBE API SETUP
   useEffect(() => {
     if (!currentLecture?.videoId || isLocked || devToolsOpen) return;
     const initPlayer = () => {
@@ -236,6 +227,20 @@ const LecturePlayer = () => {
         containerRef.current.requestFullscreen();
     } else {
         document.exitFullscreen();
+    }
+  };
+
+  // 🔥 NEW: LANDSCAPE HANDLER
+  const handleLandscape = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await containerRef.current.requestFullscreen();
+      }
+      if (window.screen.orientation && window.screen.orientation.lock) {
+        await window.screen.orientation.lock("landscape");
+      }
+    } catch (error) {
+      toast.error("Landscape rotation not supported on this browser.");
     }
   };
 
@@ -316,28 +321,23 @@ const LecturePlayer = () => {
               </div>
             )}
 
-            {/* 🔥 TOP SHIELD */}
             {!isFullscreen && !isNavigating && (
               <div className="absolute top-0 left-0 w-full h-14 bg-black z-[25] pointer-events-none flex items-center justify-center border-b border-white/5 transition-opacity duration-300">
                   <p className="text-[8px] font-black uppercase tracking-[0.4em] text-zinc-700 opacity-50">🔒 SECURE ENCRYPTED STREAM</p>
               </div>
             )}
 
-            {/* 🔥 DYNAMIC BOTTOM SHIELD */}
             {showBottomShield && !isNavigating && (
               <div className="absolute bottom-0 left-0 w-full h-14 bg-black/80 z-[25] pointer-events-none flex items-center justify-center border-t border-white/5 transition-all duration-500 animate-in fade-in slide-in-from-bottom-2">
                   <p className="text-[8px] font-black uppercase tracking-[0.4em] text-zinc-600">🛡️ SYSTEM INTEGRITY VERIFIED • ANTI-RECORD ACTIVE</p>
               </div>
             )}
 
-            {/* 🔥 HIGHLIGHTED WATERMARK */}
+            {/* 🔥 WATERMARK (EMAIL REMOVED) */}
             <div className="absolute pointer-events-none z-40 transition-all duration-[8000ms] ease-in-out select-none opacity-30 group-hover:opacity-50" style={{ top: watermarkPos.top, left: watermarkPos.left }}>
                 <div className="flex flex-col items-center bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl border border-white/20 shadow-2xl">
                     <p className="text-[9px] md:text-[11px] font-bold text-white uppercase tracking-tighter mb-0.5">
                         {user?.name || "AUTHENTICATED USER"}
-                    </p>
-                    <p className="text-[8px] md:text-[10px] font-mono text-zinc-400 lowercase mb-1">
-                        {user?.email}
                     </p>
                     <div className="h-[1px] w-full bg-white/10 my-1" />
                     <p className="text-[7px] md:text-[9px] font-black text-orange-500 uppercase tracking-[0.3em]">
@@ -391,7 +391,15 @@ const LecturePlayer = () => {
                            )}
                         </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-4">
+                        {/* 🔥 LANDSCAPE BUTTON (ONLY FOR MOBILE) */}
+                        <button 
+                          onClick={handleLandscape} 
+                          className="md:hidden p-2 bg-zinc-800 rounded-lg border border-zinc-700 text-orange-500"
+                        >
+                          <RotateCw size={20} />
+                        </button>
+                        
                         <button onClick={toggleFullscreen} className="hover:text-orange-500 transition-all"><Maximize size={24} /></button>
                     </div>
                   </div>
