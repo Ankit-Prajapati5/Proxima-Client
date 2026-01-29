@@ -21,7 +21,7 @@ import {
   BrainCircuit,
   RotateCw,
   Loader2,
-  ScreenShare, // Landscape ke liye icon
+  ScreenShare, 
   RectangleHorizontal
 } from "lucide-react";
 import confetti from "canvas-confetti";
@@ -56,6 +56,10 @@ const LecturePlayer = () => {
   const [isNavigating, setIsNavigating] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
+  // 🔥 NEW SECURITY STATES
+  const [isSecurityBreached, setIsSecurityBreached] = useState(false);
+  const [vaultKey, setVaultKey] = useState("");
+
   const { data: courseData, isLoading } = useGetCourseDetailWithLessonsQuery(courseId);
   const { data: progressData, refetch: refetchProgress } = useGetCourseProgressQuery(courseId);
   const [markCompleted, { isLoading: isMarking }] = useMarkLectureCompletedMutation();
@@ -67,6 +71,13 @@ const LecturePlayer = () => {
   const nextLecture = lectures[currentIndex + 1];
   const prevLecture = currentIndex > 0 ? lectures[currentIndex - 1] : null;
   const isLocked = !currentLecture?.isPreviewFree && !courseData?.course?.isPurchased;
+
+  // 🔥 Video ID Obfuscation
+  useEffect(() => {
+    if (currentLecture?.videoId) {
+      setVaultKey(window.btoa(currentLecture.videoId)); 
+    }
+  }, [currentLecture]);
 
   useEffect(() => {
     if (isPlaying) {
@@ -101,45 +112,67 @@ const LecturePlayer = () => {
     }, 50);
   };
 
-  // SECURITY LOGIC
+  // 🔥 ULTIMATE SECURITY ENGINE (Merged from both)
   useEffect(() => {
     let securityTimers = [];
     let isSecurityActive = false;
     const triggerSecurityLogout = () => {
-      if (devToolsOpen || !isSecurityActive) return;
+      if (devToolsOpen || isSecurityBreached || !isSecurityActive) return;
       setDevToolsOpen(true);
+      setIsSecurityBreached(true);
       if (playerRef.current) playerRef.current.destroy();
       localStorage.clear();
       dispatch(userLoggedOut());
-      toast.error("SECURITY ALERT: System Compromised.");
-      setTimeout(() => { window.location.href = "/login"; }, 500);
+      toast.error("SECURITY BREACH: Access Revoked.");
+      console.clear();
+      setTimeout(() => { window.location.href = "/login"; }, 1000);
     };
+    const checkDevTools = () => {
+      // 1. Static Size Check (Inspector Panel Detection)
+      const threshold = 160;
+      const widthDiff = window.outerWidth - window.innerWidth > threshold;
+      const heightDiff = window.outerHeight - window.innerHeight > threshold;
+
+      // 2. Performance Check (Debugger Loop)
+      const startTime = performance.now();
+      debugger; 
+      if (performance.now() - startTime > 150) triggerSecurityLogout();
+
+      if (widthDiff || heightDiff) triggerSecurityLogout();
+    };
+
     const initTimeout = setTimeout(() => {
       isSecurityActive = true;
+      checkDevTools(); // Initial check
+      securityTimers.push(setInterval(checkDevTools, 1000));
+
+      // Image property trap
       const element = new Image();
       Object.defineProperty(element, 'id', { get: triggerSecurityLogout });
       securityTimers.push(setInterval(() => { console.log(element); console.clear(); }, 2000));
-      securityTimers.push(setInterval(() => {
-        const startTime = performance.now();
-        debugger;
-        if (performance.now() - startTime > 150) triggerSecurityLogout();
-      }, 800));
-    }, 3000);
+    }, 2000);
+
+    // Mutation Observer for DOM tampering
     const observer = new MutationObserver(() => isSecurityActive && triggerSecurityLogout());
     if (containerRef.current) observer.observe(containerRef.current, { attributes: true, childList: true, subtree: true });
+
     const keyBlock = (e) => {
       if (e.key === "F12" || (e.ctrlKey && e.shiftKey && (e.key === "I" || e.key === "J" || e.key === "C")) || (e.ctrlKey && e.key === "u")) {
         e.preventDefault(); triggerSecurityLogout();
       }
     };
+
     window.addEventListener("keydown", keyBlock);
+    window.addEventListener("resize", checkDevTools);
+
     return () => {
       clearTimeout(initTimeout);
       securityTimers.forEach(clearInterval);
       observer.disconnect();
       window.removeEventListener("keydown", keyBlock);
+      window.removeEventListener("resize", checkDevTools);
     };
-  }, [dispatch, navigate, devToolsOpen]);
+  }, [dispatch, devToolsOpen, isSecurityBreached]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -154,12 +187,13 @@ const LecturePlayer = () => {
     controlsTimeout.current = setTimeout(() => { if (isPlaying) setControlsVisible(false); }, 3000);
   };
 
-  // YOUTUBE API SETUP
+  // YOUTUBE API SETUP WITH VAULT DECRYPTION
   useEffect(() => {
-    if (!currentLecture?.videoId || isLocked || devToolsOpen) return;
+    if (!vaultKey || isLocked || devToolsOpen || isSecurityBreached) return;
     const initPlayer = () => {
-      playerRef.current = new window.YT.Player("custom-player", {
-        videoId: currentLecture.videoId,
+      const realId = window.atob(vaultKey); // Decrypt in memory only
+      playerRef.current = new window.YT.Player("secure-stream-point", {
+        videoId: realId,
         playerVars: { autoplay: 0, controls: 0, disablekb: 1, rel: 0, modestbranding: 1, iv_load_policy: 3 },
         events: {
           onReady: (event) => setDuration(event.target.getDuration()),
@@ -181,7 +215,7 @@ const LecturePlayer = () => {
       document.body.appendChild(tag);
     }
     return () => { stopTracking(); if (playerRef.current) playerRef.current.destroy(); };
-  }, [currentLecture?.videoId, isLocked, devToolsOpen]);
+  }, [vaultKey, isLocked, devToolsOpen, isSecurityBreached]);
 
   const startTracking = () => {
     progressInterval.current = setInterval(() => {
@@ -203,7 +237,7 @@ const LecturePlayer = () => {
   const stopTracking = () => clearInterval(progressInterval.current);
 
   const togglePlay = () => {
-    if (!playerRef.current || devToolsOpen) return;
+    if (!playerRef.current || devToolsOpen || isSecurityBreached) return;
     const state = playerRef.current.getPlayerState();
     state === 1 ? playerRef.current.pauseVideo() : playerRef.current.playVideo();
     handleInteraction();
@@ -231,7 +265,6 @@ const LecturePlayer = () => {
     }
   };
 
-  // 🔥 NEW: LANDSCAPE HANDLER
   const handleLandscape = async () => {
     try {
       if (!document.fullscreenElement) {
@@ -273,7 +306,17 @@ const LecturePlayer = () => {
 
   if (isLoading || !currentLecture) return <Loader />;
 
-  return (
+  // 🔥 KILL SWITCH UI
+  if (isSecurityBreached) {
+    return (
+      <div className="fixed inset-0 bg-black z-[99999] flex flex-col items-center justify-center text-red-600 font-black p-10 text-center select-none">
+        <h1 className="text-5xl mb-6">🔒 SYSTEM LOCKED</h1>
+        <p className="text-xl max-w-lg opacity-80">Encryption breach detected. This session has been terminated to protect content integrity. Please reload in a secure window.</p>
+        <button onClick={() => window.location.reload()} className="mt-10 px-10 py-4 bg-zinc-900 border border-zinc-800 rounded-2xl text-white hover:bg-zinc-800 transition-all">Reload Secure Environment</button>
+      </div>
+    );
+  }
+    return (
     <div className="flex flex-col bg-black text-white w-full h-[100dvh] pt-16 overflow-hidden select-none">
       
       {devToolsOpen && (
@@ -313,8 +356,12 @@ const LecturePlayer = () => {
           <div className="w-full h-full relative flex items-center justify-center overflow-hidden">
             
             <div className={`absolute w-full h-[108%] -top-[7%] transition-all duration-1000 ${isPlaying ? 'opacity-100 scale-100' : 'opacity-10 blur-xl scale-110'}`}>
-               {!devToolsOpen && <div id="custom-player" className="w-full h-full pointer-events-none"></div>}
+               {!devToolsOpen && !isSecurityBreached && <div id="secure-stream-point" className="w-full h-full pointer-events-none"></div>}
             </div>
+
+            {/* 🔥 MULTI-LAYER SHIELD SYSTEM */}
+            <div className="absolute inset-0 z-[22] bg-transparent cursor-default" onContextMenu={(e) => e.preventDefault()} />
+            <div className="absolute inset-0 z-[23] bg-transparent pointer-events-none border-[30px] border-transparent" />
 
             {isNavigating && (
               <div className="absolute inset-0 bg-black z-[60] flex items-center justify-center">
@@ -334,7 +381,6 @@ const LecturePlayer = () => {
               </div>
             )}
 
-            {/* 🔥 WATERMARK (EMAIL REMOVED) */}
             <div className="absolute pointer-events-none z-40 transition-all duration-[8000ms] ease-in-out select-none opacity-30 group-hover:opacity-50" style={{ top: watermarkPos.top, left: watermarkPos.left }}>
                 <div className="flex flex-col items-center bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl border border-white/20 shadow-2xl">
                     <p className="text-[9px] md:text-[11px] font-bold text-white uppercase tracking-tighter mb-0.5">
@@ -347,15 +393,21 @@ const LecturePlayer = () => {
                 </div>
             </div>
 
-            {!isPlaying && !devToolsOpen && !isNavigating && (
-                <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/60 backdrop-blur-[2px]">
+            {!isPlaying && !devToolsOpen && !isSecurityBreached && !isNavigating && (
+                <div className="absolute inset-0 z-[26] flex items-center justify-center bg-black/60 backdrop-blur-[2px]">
                    <button onClick={togglePlay} className="bg-orange-600 hover:bg-orange-500 p-8 rounded-full shadow-[0_0_50px_rgba(234,88,12,0.4)] transform hover:scale-110 active:scale-95 transition-all">
                       <Play size={44} fill="white" />
                    </button>
                 </div>
             )}
             
-            <div className="absolute inset-0 z-10" onClick={togglePlay} onDoubleClick={toggleFullscreen} />
+            {/* Click to Pause Layer */}
+            <div 
+              className="absolute inset-0 z-[21]" 
+              onClick={togglePlay} 
+              onDoubleClick={toggleFullscreen} 
+              onContextMenu={(e) => e.preventDefault()}
+            />
 
             <div className={`absolute inset-0 z-30 flex flex-col justify-end bg-gradient-to-t from-black via-transparent transition-opacity duration-700 p-6 ${controlsVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
                <div className="max-w-6xl mx-auto w-full space-y-4">
@@ -393,7 +445,6 @@ const LecturePlayer = () => {
                         </div>
                     </div>
                     <div className="flex items-center gap-4">
-                        {/* 🔥 LANDSCAPE BUTTON (ONLY FOR MOBILE) */}
                         <button 
                           onClick={handleLandscape} 
                           className="md:hidden p-2 bg-zinc-800 rounded-lg border border-zinc-700 text-orange-500"
