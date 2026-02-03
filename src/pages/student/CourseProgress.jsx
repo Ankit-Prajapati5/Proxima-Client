@@ -6,7 +6,15 @@ import {
 } from "@/features/api/progressApi";
 import { toast } from "sonner";
 import Loader from "@/components/Loader";
-import { CheckCircle, PlayCircle, RotateCcw, ArrowRight, ArrowLeft, BadgeCheck } from "lucide-react";
+import { 
+  CheckCircle, 
+  PlayCircle, 
+  RotateCcw, 
+  ArrowRight, 
+  ArrowLeft, 
+  BadgeCheck,
+  BrainCircuit
+} from "lucide-react";
 
 const CourseProgress = () => {
   const { courseId } = useParams();
@@ -111,14 +119,13 @@ const CourseProgress = () => {
             Course Content 
             <span className="text-sm font-normal text-zinc-400">({totalLectures} Lessons)</span>
         </h3>
+
         {lectures.map((lecture, index) => {
-          
-          // ✅ FIX: Stronger matching logic for populated data
-          // Ye check karta hai ki array me lecture._id ya poora object matching ID ke sath hai ya nahi
+
           const isCompleted = completedLectures.some((c) => 
             (typeof c === "string" ? c : c._id) === lecture._id
           );
-          
+
           return (
             <div 
               key={lecture._id}
@@ -129,30 +136,74 @@ const CourseProgress = () => {
                 : 'border-zinc-100 dark:border-zinc-800 hover:border-blue-500/50 hover:bg-blue-50/30 dark:hover:bg-zinc-800/50'
               }`}
             >
-              <div className="flex items-center gap-4">
-                <span className="text-zinc-400 font-mono text-sm">{String(index + 1).padStart(2, '0')}.</span>
-                <div className="flex flex-col md:flex-row md:items-center gap-2">
-                  <h4 className={`font-semibold transition-colors ${isCompleted ? 'text-zinc-400 line-through' : 'group-hover:text-blue-600'}`}>
-                    {lecture.lectureTitle}
-                  </h4>
+              <div className="flex items-center gap-4 w-full justify-between">
+
+                <div className="flex items-center gap-4">
+                  <span className="text-zinc-400 font-mono text-sm">
+                    {String(index + 1).padStart(2, '0')}.
+                  </span>
+
+                  <div className="flex flex-col md:flex-row md:items-center gap-2">
+                    <h4 className={`font-semibold transition-colors ${
+                      isCompleted 
+                      ? 'text-zinc-400 line-through' 
+                      : 'group-hover:text-blue-600'
+                    }`}>
+                      {lecture.lectureTitle}
+                    </h4>
+
+                    {isCompleted && (
+                      <span className="flex items-center gap-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider w-fit">
+                        <BadgeCheck size={12} />
+                        Completed
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 🔥 Quiz Button + Status */}
+                <div className="flex items-center gap-3">
                   
-                  {/* ✅ Badge Logic */}
-                  {isCompleted && (
-                    <span className="flex items-center gap-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider w-fit">
-                      <BadgeCheck size={12} />
-                      Completed
-                    </span>
+                 <button
+  onClick={(e) => {
+    e.stopPropagation();
+
+    if (!isCompleted) {
+      toast.error("Quiz attempt karne ke liye lecture complete karo");
+      return;
+    }
+
+    navigate(`/course/${courseId}/lecture/${lecture._id}/quiz`);
+  }}
+  className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+    isCompleted
+      ? "bg-purple-600 hover:bg-purple-500 text-white"
+      : "bg-zinc-800 text-zinc-500 border border-zinc-700"
+  }`}
+>
+  <BrainCircuit size={14} />
+  {isCompleted ? "Take Quiz" : "Unlock Quiz"}
+</button>
+
+
+                  {isCompleted ? (
+                    <div className="bg-green-100 dark:bg-green-900/30 p-1.5 rounded-full transition-all group-hover:scale-110">
+                      <CheckCircle
+                        className="text-green-500"
+                        size={18}
+                        fill="currentColor"
+                        fillOpacity={0.2}
+                      />
+                    </div>
+                  ) : (
+                    <PlayCircle
+                      className="text-zinc-300 group-hover:text-blue-500 transition-all group-hover:scale-110"
+                      size={20}
+                    />
                   )}
                 </div>
+
               </div>
-              
-              {isCompleted ? (
-                <div className="bg-green-100 dark:bg-green-900/30 p-1.5 rounded-full transition-all group-hover:scale-110">
-                    <CheckCircle className="text-green-500" size={18} fill="currentColor" fillOpacity={0.2} />
-                </div>
-              ) : (
-                <PlayCircle className="text-zinc-300 group-hover:text-blue-500 transition-all group-hover:scale-110" size={20} />
-              )}
             </div>
           );
         })}

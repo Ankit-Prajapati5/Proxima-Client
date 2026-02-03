@@ -713,24 +713,7 @@ const LecturePlayer = () => {
         </div>
         <div className="flex items-center gap-4 w-full md:w-auto">
           <div className="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto">
-            {/* Quiz Button */}
-            <button
-              onClick={() =>
-                isEligibleForComplete &&
-                navigate(`/course/${courseId}/lecture/${lectureId}/quiz`)
-              }
-              disabled={!isEligibleForComplete}
-              className={`w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-bold active:scale-95 transition-all shadow-lg text-sm md:text-base ${
-                isEligibleForComplete
-                  ? "bg-zinc-900 hover:bg-zinc-800 text-purple-400 border border-purple-500/30"
-                  : "bg-zinc-800 text-zinc-500 border border-zinc-700 cursor-not-allowed"
-              }`}
-            >
-              <BrainCircuit size={18} className="shrink-0" />
-              <span className="whitespace-nowrap">
-                {isEligibleForComplete ? "Take Quiz" : "90% Min for Quiz"}
-              </span>
-            </button>
+           
 
             {/* Mark Complete Button */}
             <button
@@ -748,7 +731,7 @@ const LecturePlayer = () => {
                 <CheckCircle size={18} className="shrink-0" />
               )}
               <span className="whitespace-nowrap">
-                {isEligibleForComplete ? "Mark Complete" : "90% Min"}
+                {isEligibleForComplete ? "Mark Complete" : "Watch 90% Min to Complete"}
               </span>
             </button>
           </div>
